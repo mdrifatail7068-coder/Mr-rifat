@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>মিস্টার রিফাত | ডেভেলপার</title>
+
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#05050f; }
+  canvas { display:block; }
+
+  #loader {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: #05050f; color: #4df;
+    font-family: 'Noto Sans Bengali', sans-serif; font-size: 22px;
+    transition: opacity .7s ease;
+  }
+
+  #hint {
+    position: fixed; bottom: 16px; left: 0; width: 100%; z-index: 5;
+    text-align: center; pointer-events: none;
+    color: rgba(160, 220, 255, .55);
+    font-family: 'Noto Sans Bengali', sans-serif;
+    font-size: 14px; letter-spacing: 1px;
+    text-shadow: 0 0 12px rgba(0, 229, 255, .4);
+  }
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@700;900&display=swap" rel="stylesheet">
+</head>
+
+<body>
+<div id="loader">লোড হচ্ছে…</div>
+<div id="hint">মাউস দিয়ে ঘোরান • স্ক্রল করে জুম করুন</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   ১. বাংলা ফন্ট লোড হওয়া পর্যন্ত অপেক্ষা
+   ============================================================ */
+try { await document.fonts.load('900 300px "Noto Sans Bengali"'); } catch (e) {}
+await document.fonts.ready;
+
+const loader = document.getElementById('loader');
+loader.style.opacity = '0';
+setTimeout(() => loader.remove(), 700);
+
+/* ============================================================
+   ২. সিন / ক্যামেরা / রেন্ডারার
+   ============================================================ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05050f);
+scene.fog = new THREE.FogExp2(0x05050f, 0.018);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(0, 0.6, 16);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+/* ============================================================
+   ৩. অরবিট কন্ট্রোল (ক্যামেরা কখনো টেক্সটের পিছনে যাবে না)
+   ============================================================ */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 8;
+controls.maxDistance = 28;
+controls.minAzimuthAngle = -0.85;
+controls.maxAzimuthAngle =  0.85;
+controls.minPolarAngle = Math.PI * 0.25;
+controls.maxPolarAngle = Math.PI * 0.75;
+
+/* ============================================================
+   ৪. লাইটিং
+   ============================================================ */
+scene.add(new THREE.AmbientLight(0x334466, 1.2));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+keyLight.position.set(6, 10, 8);
+scene.add(keyLight);
+
+const lightPink = new THREE.PointLight(0xff2fd0, 60, 60);
+lightPink.position.set(-8, 5, 8);
+scene.add(lightPink);
+
+const lightCyan = new THREE.PointLight(0x00e5ff, 60, 60);
+lightCyan.position.set(8, -5, 8);
+scene.add(lightCyan);
+
+const lightViolet = new THREE.PointLight(0x7a5cff, 40, 70);
+lightViolet.position.set(0, 0, -12);
+scene.add(lightViolet);
+
+/* ============================================================
+   ৫. বিশ্ব (যা ধীরে ধীরে দোলে)
+   ============================================================ */
+const world = new THREE.Group();
+scene.add(world);
+
+/* ============================================================
+   ৬. তারাভরা আকাশ
+   ============================================================ */
+(function createStars() {
+  const COUNT = 2500;
+  const positions = new Float32Array(COUNT * 3);
+
+  for (let i = 0; i < COUNT; i++) {
+    const r  = 60 + Math.random() * 120;
+    const th = Math.random() * Math.PI * 2;
+    const ph = Math.acos(2 * Math.random() - 1);
+
+    positions[i * 3]     = r * Math.sin(ph) * Math.cos(th);
+    positions[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+    positions[i * 3 + 2] = r * Math.cos(ph);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: 0x9fd8ff,
+    size: 0.6,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false
+  });
+
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+/* ============================================================
+   ৭. ভাসমান থ্রিডি জিওমেট্রি
+   ============================================================ */
+const floaters = new THREE.Group();
+world.add(floaters);
+
+const palette = [0x00e5ff, 0xff2fd0, 0x7a5cff, 0x39ff88, 0xffb648];
+
+for (let i = 0; i < 40; i++) {
+  const pick = Math.random();
+  const geo =
+    pick < 0.34 ? new THREE.BoxGeometry(0.5, 0.5, 0.5) :
+    pick < 0.67 ? new THREE.IcosahedronGeometry(0.4, 0) :
+                  new THREE.TorusGeometry(0.32, 0.12, 8, 20);
+
+  const color = palette[(Math.random() * palette.length) | 0];
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: color,
+    emissive: color,
+    emissiveIntensity: 0.55,
+    metalness: 0.85,
+    roughness: 0.25,
+    transparent: true,
+    opacity: 0.9
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(
+    (Math.random() - 0.5) * 34,
+    (Math.random() - 0.5) * 20,
+    -6 - Math.random() * 20      // সবসময় টেক্সটের পিছনে
+  );
+  mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+
+  mesh.userData = {
+    rotX: (Math.random() - 0.5) * 0.012,
+    rotY: (Math.random() - 0.5) * 0.012,
+    floatSpeed: 0.3 + Math.random() * 0.6,
+    phase: Math.random() * Math.PI * 2,
+    baseY: mesh.position.y
+  };
+
+  floaters.add(mesh);
+}
+
+/* ============================================================
+   ৮. টেক্সট → ক্যানভাস টেক্সচার (বাংলা সাপোর্ট)
+   ============================================================ */
+function makeTextTexture(text, color) {
+  const FONT_SIZE = 300;
+  const FONT = `900 ${FONT_SIZE}px "Noto Sans Bengali", "Nirmala UI", "Vrinda", sans-serif`;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  ctx.font = FONT;
+  const textWidth = Math.max(ctx.measureText(text).width, 10);
+
+  const PAD_X = 120;
+  const PAD_Y = 120;
+
+  const W = THREE.MathUtils.ceilPowerOfTwo(textWidth + PAD_X * 2);
+  const H = THREE.MathUtils.ceilPowerOfTwo(FONT_SIZE * 1.5 + PAD_Y * 2);
+
+  canvas.width = W;
+  canvas.height = H;
+
+  ctx.font = FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+
+  // বাইরের নিওন গ্লো
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 70;
+  ctx.fillStyle = color;
+  for (let i = 0; i < 3; i++) ctx.fillText(text, W / 2, H / 2);
+
+  // ভেতরের সাদা আভা
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, W / 2, H / 2);
+
+  // মূল রঙের স্তর
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = color;
+  ctx.fillText(text, W / 2, H / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  texture.needsUpdate = true;
+
+  return { texture, aspect: W / H };
+}
+
+/* ============================================================
+   ৯. স্তরে স্তরে সাজানো থ্রিডি টেক্সট (বেধ তৈরি করে)
+   ============================================================ */
+function create3DText(text, color, height, layers = 4, gap = 0.07) {
+  const { texture, aspect } = makeTextTexture(text, color);
+
+  const width = height * aspect;
+  const geometry = new THREE.PlaneGeometry(width, height);
+
+  const group = new THREE.Group();
+
+  for (let i = layers - 1; i >= 0; i--) {
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      emissive: new THREE.Color(color),
+      emissiveIntensity: i === 0 ? 1.4 : 0.45,
+      metalness: 0.2,
+      roughness: 0.45,
+      opacity: i === 0 ? 1 : 0.22
+    });
+
+    const layer = new THREE.Mesh(geometry, material);
+    layer.position.z = -i * gap;
+    layer.renderOrder = layers - i;   // পিছনের স্তর আগে আঁকা হবে
+    group.add(layer);
+  }
+
+  return group;
+}
+
+/* ============================================================
+   ১০. টেক্সট বসানো
+   ============================================================ */
+const nameText = create3DText('মিস্টার রিফাত', '#00e5ff', 2.4);
+nameText.position.set(0, 1.5, 0);
+world.add(nameText);
+
+const roleText = create3DText('ডেভেলপার', '#ff2fd0', 1.35);
+roleText.position.set(0, -1.5, 0);
+world.add(roleText);
+
+/* ============================================================
+   ১১. রিসাইজ
+   ============================================================ */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================
+   ১২. অ্যানিমেশন লুপ
+   ============================================================ */
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+  elapsed += delta;
+
+  // পুরো বিশ্ব ধীরে ধীরে ডানে-বাঁয়ে দোল খায় (থ্রিডি প্যারালাক্স)
+  world.rotation.y = Math.sin(elapsed * 0.22) * 0.42;
+
+  // টেক্সট ভাসমান
+  nameText.position.y = 1.5  + Math.sin(elapsed * 1.1) * 0.13;
+  roleText.position.y = -1.5 + Math.sin(elapsed * 1.1 + 1.2) * 0.11;
+
+  // ভাসমান জিওমেট্রি ঘোরে ও ওঠানামা করে
+  floaters.children.forEach((mesh) => {
+    mesh.rotation.x += mesh.userData.rotX;
+    mesh.rotation.y += mesh.userData.rotY;
+    mesh.position.y = mesh.userData.baseY +
+      Math.sin(elapsed * mesh.userData.floatSpeed + mesh.userData.phase) * 0.8;
+  });
+  floaters.rotation.y += delta * 0.04;
+
+  // কালার লাইট দুটি পরস্পরের বিপরীতে ঘোরে
+  lightPink.position.x = Math.cos(elapsed * 0.6) * 10;
+  lightPink.position.z = Math.sin(elapsed * 0.6) * 10;
+
+  lightCyan.position.x = Math.cos(elapsed * 0.6 + Math.PI) * 10;
+  lightCyan.position.z = Math.sin(elapsed * 0.6 + Math.PI) * 10;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+  </html>
